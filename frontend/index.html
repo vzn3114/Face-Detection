@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Giám Sát Khuôn Mặt AI</title>
+
+    <!-- Google Fonts: Inter (UI) + JetBrains Mono (data/telemetry) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <!-- Feather Icons CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+
+    <!-- ApexCharts CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+    <!-- Custom Stylesheet -->
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+
+<body>
+
+    <!-- Ambient vignette overlay -->
+    <div class="scanlines"></div>
+
+    <!-- Top Navigation Header -->
+    <header>
+        <div class="header-title-section">
+            <span class="header-logo-icon">
+                <i data-feather="video"></i>
+            </span>
+            <span class="header-title">Hệ Thống Giám Sát Khuôn Mặt AI</span>
+            <div class="header-status-badge">
+                <span class="header-status-dot"></span>
+                <span>Đang hoạt động</span>
+            </div>
+        </div>
+
+        <div class="header-stats">
+            <div class="header-stat-item">Độ trễ xử lý <span id="lbl-header-load">Đang chờ</span></div>
+            <div class="header-stat-item">FPS luồng <span id="lbl-header-fps">0.0</span></div>
+        </div>
+
+        <div class="header-clock" id="header-digital-clock">00:00:00</div>
+    </header>
+
+    <!-- Main Grid Container -->
+    <div class="main-container">
+
+        <!-- VÙNG 1: MONITOR VIEWPORT -->
+        <section class="control-panel-box camera-viewport-container">
+            <div class="panel-header-bar">
+                <div class="panel-header-icon-group">
+                    <i data-feather="tv"></i>
+                    <span>Màn hình giám sát — Kênh 01</span>
+                </div>
+                <span id="lbl-viewport-source"
+                    style="font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--primary); font-weight: 600;">NGUỒN:
+                    ĐANG CHỜ</span>
+            </div>
+
+            <div class="panel-body-content" style="padding: 0.5rem;">
+                <div class="viewport-screen">
+                    <!-- Reticles HUD guides -->
+                    <div class="screen-reticle-box"></div>
+                    <div class="screen-corner-marker tl"></div>
+                    <div class="screen-corner-marker tr"></div>
+                    <div class="screen-corner-marker bl"></div>
+                    <div class="screen-corner-marker br"></div>
+
+                    <!-- Recording HUD Status -->
+                    <div class="cctv-rec-info">
+                        <span class="cctv-rec-red-dot"></span>
+                        <span>REC</span>
+                    </div>
+                    <div class="cctv-resolution-info" id="lbl-hud-resolution">640x480</div>
+
+                    <!-- Standby placeholder -->
+                    <div class="feed-standby-placeholder" id="viewport-placeholder">
+                        <i data-feather="video"></i>
+                        <span style="font-weight: 700; color: #fff;">Chưa có nguồn hình ảnh</span>
+                        <span style="font-size: 0.78rem; max-width: 300px; color: var(--text-muted);">Chọn nguồn camera
+                            ở bảng điều khiển bên phải để bắt đầu nhận diện</span>
+                    </div>
+
+                    <!-- Media Wrappers -->
+                    <div class="media-wrapper" id="media-wrapper-el" style="display: none;">
+                        <!-- Webcam streaming -->
+                        <video id="webcam-raw-feed" class="raw-feed-media" autoplay playsinline muted></video>
+                        <!-- Local video files -->
+                        <video id="video-file-feed" class="raw-feed-media" autoplay muted></video>
+                        <!-- Static uploaded image -->
+                        <img id="raw-uploaded-image" class="raw-feed-media" alt="Surveillance frame">
+                        <!-- Canvas overlay layers -->
+                        <canvas id="overlay-drawing-canvas" class="overlay-drawing-canvas"></canvas>
+                    </div>
+
+                    <!-- Custom Viewport Control Bar -->
+                    <div class="viewport-controls-overlay" id="viewport-controls-overlay" style="display: none;">
+                        <button class="control-action-btn" id="btn-toggle-stream-play" title="Tạm dừng / Tiếp tục">
+                            <i data-feather="pause"></i>
+                        </button>
+                        <div class="video-progress-container" id="video-progress-container" style="display: none;">
+                            <input type="range" class="video-progress-slider" id="video-progress-slider" min="0" max="100" value="0">
+                            <span class="video-time-lbl" id="lbl-video-time">00:00 / 00:00</span>
+                        </div>
+                        <div class="stream-status-badge" id="badge-stream-live" style="display: none;">
+                            <span class="status-dot-blink"></span>
+                            <span>LIVE</span>
+                        </div>
+                    </div>
+
+                    <!-- Loader spinner -->
+                    <div class="viewport-loader-overlay" id="viewport-loader">
+                        <div class="loader-spinner-circle"></div>
+                        <span class="loader-status-text" id="lbl-loader-text">Đang kết nối camera...</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VÙNG 2: FACE TARGETS GALLERY -->
+        <section class="control-panel-box face-gallery-panel">
+            <div class="panel-header-bar">
+                <div class="panel-header-icon-group">
+                    <i data-feather="users"></i>
+                    <span>Mục tiêu phát hiện</span>
+                </div>
+                <span class="telemetry-lbl-txt" style="color: var(--primary); font-family: 'JetBrains Mono', monospace;"
+                    id="lbl-gallery-count">TỔNG SỐ: 0 MỤC TIÊU</span>
+            </div>
+            <div class="panel-body-content"
+                style="padding: 0.5rem; overflow-x: auto; flex-direction: row; gap: 0.6rem; display: flex; align-items: center;"
+                id="gallery-container-el">
+                <div
+                    style="color: var(--text-muted); font-size: 0.78rem; width: 100%; text-align: center; font-style: italic;">
+                    Chưa phát hiện mục tiêu nào trong khung hình</div>
+            </div>
+        </section>
+
+        <!-- VÙNG 3: BOTTOM ACTIVITY LOGS -->
+        <section class="control-panel-box bottom-logs-feed-panel">
+            <div class="panel-header-bar">
+                <div class="panel-header-icon-group">
+                    <i data-feather="list"></i>
+                    <span>Nhật ký cảnh báo</span>
+                </div>
+                <button id="btn-clear-alerts" title="Xóa danh sách cảnh báo" aria-label="Xóa nhật ký cảnh báo"
+                    style="background: none; border: none; color: var(--text-muted); cursor: pointer; display: flex; align-items: center; padding: 0.25rem;">
+                    <i data-feather="trash-2" style="width: 14px; height: 14px;"></i>
+                </button>
+            </div>
+            <div class="panel-body-content" style="padding: 0.5rem;">
+                <div class="alert-feed-logs" id="alert-feed-el">
+                    <div class="alert-feed-item normal">
+                        <span class="alert-time">00:00:00</span>
+                        <span>Khởi chạy hệ thống giám sát. Cổng API trực tuyến.</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- VÙNG 4: RIGHT CONTROL PANEL -->
+        <section class="control-panel-box right-control-panel">
+            <div class="panel-header-bar">
+                <div class="panel-header-icon-group">
+                    <i data-feather="sliders"></i>
+                    <span>Bảng điều khiển</span>
+                </div>
+            </div>
+
+            <div class="panel-body-content">
+                <!-- Dropdown selector: Camera input -->
+                <div class="control-group-block">
+                    <label class="control-group-label" for="dropdown-source-select">Nguồn dữ liệu camera</label>
+                    <select class="dropdown-field" id="dropdown-source-select">
+                        <option value="idle" selected>Chọn nguồn camera...</option>
+                        <option value="upload">Tải ảnh tĩnh từ máy tính</option>
+                        <option value="video">Tải file video (MP4/AVI)</option>
+                        <option value="webcam">Webcam USB trực tiếp</option>
+                    </select>
+                    <button id="btn-reupload-file" class="action-utility-btn" style="margin-top: 0.55rem; display: none; width: 100%;">
+                        <i data-feather="upload"></i>
+                        <span>Tải tệp mới</span>
+                    </button>
+                </div>
+
+                <!-- Telemetry parameters summary -->
+                <div class="control-group-block">
+                    <label class="control-group-label">Đo lường hệ thống</label>
+                    <div class="telemetry-row">
+                        <div class="telemetry-item-box">
+                            <span class="telemetry-lbl-txt">Số khuôn mặt</span>
+                            <span class="telemetry-val-num" id="lbl-telemetry-faces">0</span>
+                        </div>
+                        <div class="telemetry-item-box">
+                            <span class="telemetry-lbl-txt">Độ trễ AI</span>
+                            <span class="telemetry-val-num" id="lbl-telemetry-latency">0 ms</span>
+                        </div>
+                    </div>
+                    <div class="telemetry-row" style="margin-top: 0.55rem;">
+                        <div class="telemetry-item-box">
+                            <span class="telemetry-lbl-txt">Mật độ đám đông</span>
+                            <span class="telemetry-val-num" id="lbl-telemetry-density"
+                                style="color: var(--success); font-size: 0.95rem;">LOW (0%)</span>
+                        </div>
+                        <div class="telemetry-item-box">
+                            <span class="telemetry-lbl-txt">FPS dòng</span>
+                            <span class="telemetry-val-num" id="lbl-telemetry-fps">0.0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ApexCharts: Face Quality Donut Chart -->
+                <div class="control-group-block">
+                    <label class="control-group-label">Chất lượng khuôn mặt</label>
+                    <div id="chart-quality-donut"></div>
+                </div>
+
+                <!-- ApexCharts: Head Pose Horizontal Bar Chart -->
+                <div class="control-group-block">
+                    <label class="control-group-label">Hướng góc mặt (pose)</label>
+                    <div id="chart-pose-bar"></div>
+                </div>
+
+                <!-- ApexCharts: Historical Detection Line Chart -->
+                <div class="control-group-block">
+                    <label class="control-group-label">Lịch sử phát hiện</label>
+                    <div id="chart-history-line"></div>
+                </div>
+
+                <!-- Display Overlay Toggles -->
+                <div class="control-group-block">
+                    <label class="control-group-label">Tuỳ chọn hiển thị</label>
+                    <div class="checkbox-options-grid">
+                        <label class="chk-option-lbl">
+                            <input type="checkbox" id="chk-bbox" checked>
+                            <span>Khung Bbox</span>
+                        </label>
+                        <label class="chk-option-lbl">
+                            <input type="checkbox" id="chk-mask" checked>
+                            <span>Mặt nạ U-Net</span>
+                        </label>
+                        <label class="chk-option-lbl">
+                            <input type="checkbox" id="chk-landm" checked>
+                            <span>Điểm mốc</span>
+                        </label>
+                        <label class="chk-option-lbl">
+                            <input type="checkbox" id="chk-conf" checked>
+                            <span>Tỉ lệ %</span>
+                        </label>
+                        <label class="chk-option-lbl">
+                            <input type="checkbox" id="chk-faceid" checked>
+                            <span>Mã Target ID</span>
+                        </label>
+                        <label class="chk-option-lbl">
+                            <input type="checkbox" id="chk-facequality" checked>
+                            <span>Chất lượng</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- View Mode Presets -->
+                <div class="control-group-block">
+                    <label class="control-group-label">Chế độ hiển thị</label>
+                    <div class="preset-buttons-row">
+                        <button class="preset-btn" id="btn-mode-normal">Normal</button>
+                        <button class="preset-btn" id="btn-mode-detect">Detect</button>
+                        <button class="preset-btn active" id="btn-mode-segment">Segment</button>
+                    </div>
+                </div>
+
+                <!-- Confidence threshold slider group -->
+                <div class="control-group-block">
+                    <label class="control-group-label">Ngưỡng tin cậy tối thiểu</label>
+                    <div class="cfg-slider-block">
+                        <input type="range" class="cfg-slider-el" id="slider-conf-thresh" min="0.1" max="0.9"
+                            step="0.05" value="0.50">
+                        <span class="cfg-slider-val" id="lbl-slider-thresh-val">0.50</span>
+                    </div>
+                </div>
+
+                <!-- Backbone weight selector -->
+                <div class="control-group-block">
+                    <label class="control-group-label">Kiến trúc backbone</label>
+                    <div class="backbone-info-row">
+                        <div>Detector: <b id="lbl-detector-backbone">RetinaFace (MNet)</b></div>
+                        <div>Segmenter: <b>U-Net (ONNX CPU)</b></div>
+                    </div>
+                    <div class="preset-buttons-row" style="margin-top: 0.55rem;">
+                        <button class="preset-btn active" id="btn-net-mnet">MobileNet</button>
+                        <button class="preset-btn" id="btn-net-resnet">ResNet50</button>
+                    </div>
+                </div>
+
+                <!-- Action Utilities Buttons -->
+                <div class="control-group-block" style="margin-top: auto; margin-bottom: 0;">
+                    <label class="control-group-label">Lưu trữ bằng chứng</label>
+                    <div class="action-buttons-grid">
+                        <div class="action-row">
+                            <button class="action-utility-btn" id="btn-save-frame" disabled
+                                title="Lưu khung hình chụp có vẽ Bbox">
+                                <i data-feather="image"></i>
+                                <span>Lưu khung</span>
+                            </button>
+                            <button class="action-utility-btn" id="btn-save-crops" disabled
+                                title="Tải tất cả khuôn mặt trong suốt">
+                                <i data-feather="crop"></i>
+                                <span>Lưu chân dung</span>
+                            </button>
+                        </div>
+                        <div class="action-row">
+                            <button class="action-utility-btn" id="btn-snapshot" disabled
+                                title="Lưu hồ sơ bằng chứng gồm mặt, mask và JSON">
+                                <i data-feather="camera"></i>
+                                <span>Chụp evidence</span>
+                            </button>
+                            <button class="action-utility-btn" id="btn-export-result" disabled
+                                title="Xuất toàn bộ toạ độ JSON và mặt nạ nhị phân">
+                                <i data-feather="download"></i>
+                                <span>Xuất data</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Hidden file inputs -->
+    <input type="file" id="file-uploader-input" accept="image/*" style="display: none;">
+    <input type="file" id="video-uploader-input" accept="video/*" style="display: none;">
+
+    <!-- Custom Javascript logic -->
+    <script src="/static/js/app.js"></script>
+</body>
+
+</html>

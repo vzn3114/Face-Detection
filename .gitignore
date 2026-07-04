@@ -1,0 +1,17 @@
+# Ignored files and folders
+
+# Model weights (too large for GitHub standard push, exceeding 100MB limit)
+backend/weights/*.pth
+backend/weights/*.onnx
+backend/weights/*.tar
+backend/weights/
+
+# Python cache
+**/__pycache__/
+*.pyc
+
+# Local IDEs configuration
+.vscode/
+.idea/
+.gemini/
+.system_generated/
